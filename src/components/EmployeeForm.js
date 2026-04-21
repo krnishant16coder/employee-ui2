@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { createEmployee, getEmployees } from "../services/api";
+import {
+  createEmployee,
+  getEmployees,
+  updateEmployee,
+  deleteEmployee,
+} from "../services/api";
+import EmployeeTable from "./EmployeeTable";
+import Toast from "./Toast";
 
 const EmployeeForm = () => {
   const [form, setForm] = useState({
@@ -10,10 +17,9 @@ const EmployeeForm = () => {
   });
 
   const [employees, setEmployees] = useState([]);
-  const [msg, setMsg] = useState("");
-  const [err, setErr] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [toast, setToast] = useState({ msg: "", type: "" });
 
-  // 🔥 Load data on page load
   useEffect(() => {
     fetchEmployees();
   }, []);
@@ -22,98 +28,112 @@ const EmployeeForm = () => {
     try {
       const data = await getEmployees();
       setEmployees(data);
-    } catch (e) {
-      setErr("Failed to load employees");
+    } catch {
+      showToast("Failed to load employees", "error");
     }
   };
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
-  const validate = () => {
-    if (!form.firstName || !form.lastName || !form.email || !form.department) {
-      return "All fields are required";
-    }
-    if (!form.email.includes("@")) return "Invalid email";
-    return null;
+  const showToast = (msg, type) => {
+    setToast({ msg, type });
+    setTimeout(() => setToast({ msg: "", type: "" }), 3000);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMsg("");
-    setErr("");
-
-    const validationError = validate();
-    if (validationError) {
-      setErr(validationError);
-      return;
-    }
 
     try {
-      await createEmployee(form);
-      setMsg("Employee created!");
+      if (editingId) {
+        await updateEmployee(editingId, form);
+        showToast("Employee updated", "success");
+      } else {
+        await createEmployee(form);
+        showToast("Employee created", "success");
+      }
 
-      setForm({
-        firstName: "",
-        lastName: "",
-        email: "",
-        department: "",
-      });
-
-      fetchEmployees(); // 🔥 refresh table
-    } catch (error) {
-      setErr(error.message);
+      resetForm();
+      fetchEmployees();
+    } catch {
+      showToast("Operation failed", "error");
     }
   };
 
+  const handleEdit = (emp) => {
+    setForm(emp);
+    setEditingId(emp.id);
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this employee?")) return;
+
+    try {
+      await deleteEmployee(id);
+      showToast("Deleted successfully", "success");
+      fetchEmployees();
+    } catch {
+      showToast("Delete failed", "error");
+    }
+  };
+
+  const resetForm = () => {
+    setForm({
+      firstName: "",
+      lastName: "",
+      email: "",
+      department: "",
+    });
+    setEditingId(null);
+  };
+
   return (
-    <div className="container">
-      <h2>Employee Management</h2>
+    <div className="page">
+      <Toast message={toast.msg} type={toast.type} />
 
-      {/* FORM */}
-      <form onSubmit={handleSubmit}>
-        <input name="firstName" placeholder="First Name" value={form.firstName} onChange={handleChange} />
-        <input name="lastName" placeholder="Last Name" value={form.lastName} onChange={handleChange} />
-        <input name="email" placeholder="Email" value={form.email} onChange={handleChange} />
-        <input name="department" placeholder="Department" value={form.department} onChange={handleChange} />
+      <div className="card">
+        <h2>{editingId ? "Edit Employee" : "Add Employee"}</h2>
 
-        <button type="submit">Add Employee</button>
-      </form>
+        <form onSubmit={handleSubmit} className="form">
+          <div className="row">
+            <input
+              value={form.firstName}
+              placeholder="First Name"
+              onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+            />
+            <input
+              value={form.lastName}
+              placeholder="Last Name"
+              onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+            />
+          </div>
 
-      {msg && <p className="success">{msg}</p>}
-      {err && <p className="error">{err}</p>}
+          <input
+            value={form.email}
+            placeholder="Email"
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+          />
 
-      {/* TABLE */}
-      <h3>Employee List</h3>
+          <input
+            value={form.department}
+            placeholder="Department"
+            onChange={(e) =>
+              setForm({ ...form, department: e.target.value })
+            }
+          />
 
-      <table>
-        <thead>
-          <tr>
-            <th>First Name</th>
-            <th>Last Name</th>
-            <th>Email</th>
-            <th>Department</th>
-          </tr>
-        </thead>
+          <button>{editingId ? "Update" : "Create"}</button>
 
-        <tbody>
-          {employees.length === 0 ? (
-            <tr>
-              <td colSpan="4">No data</td>
-            </tr>
-          ) : (
-            employees.map((emp, index) => (
-              <tr key={index}>
-                <td>{emp.firstName}</td>
-                <td>{emp.lastName}</td>
-                <td>{emp.email}</td>
-                <td>{emp.department}</td>
-              </tr>
-            ))
+          {editingId && (
+            <button type="button" onClick={resetForm} className="btn cancel">
+              Cancel
+            </button>
           )}
-        </tbody>
-      </table>
+        </form>
+      </div>
+
+      <EmployeeTable
+        employees={employees}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+      />
     </div>
   );
 };

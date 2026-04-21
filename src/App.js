@@ -1,10 +1,9 @@
+import React from "react";
+import EmployeeForm from "./components/EmployeeForm";
+import "./App.css";
 
 function App() {
-  return (
-    <div className="App">
-      <h1>Welcome to Nishant's React App!</h1>
-    </div>
-  );
+  return <EmployeeForm />;
 }
 
 export default App;
